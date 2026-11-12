@@ -257,10 +257,11 @@
   }
   function renderTasks() {
     const search = $("task-search").value.trim().toLocaleLowerCase();
+    const label = appliedLabel;
     const status = $("status-filter").value; const priority = $("priority-filter").value;
-    const filtered = Boolean(search || status !== "all" || priority !== "all");
+    const filtered = Boolean(search || label || status !== "all" || priority !== "all");
     $("clear-filters").hidden = !filtered;
-    const selected = tasks().filter((task) => (!search || `${task.title}\n${task.description}\n${task.id}`.toLocaleLowerCase().includes(search)) && (status === "all" || task.status === status) && (priority === "all" || String(task.priority) === priority))
+    const selected = tasks().filter((task) => (!label || list(task.labels).includes(label)) && (!search || `${task.title}\n${task.description}\n${task.id}`.toLocaleLowerCase().includes(search)) && (status === "all" || task.status === status) && (priority === "all" || String(task.priority) === priority))
       .sort((a, b) => (a.priority - b.priority) || String(b.updated_at).localeCompare(String(a.updated_at)));
     const board = $("task-board"); board.classList.toggle("filtered", filtered); board.classList.toggle("cancelled-visible", !filtered && selected.some((task) => task.status === "cancelled")); board.replaceChildren();
     const empty = $("tasks-empty"); empty.hidden = selected.length > 0; board.hidden = selected.length === 0;
@@ -400,6 +401,9 @@
     });
     content.replaceChildren(el("h3", "detail-title", task.title), badges, meta);
     content.append(detailSection("任务描述", detailText(task.description, "尚未填写任务描述")));
+    const labels = el("div", "detail-resources"); list(task.labels).forEach((label) => labels.append(el("code", "", label)));
+    if (!list(task.labels).length) labels.append(el("span", "empty-value", "无标签"));
+    content.append(detailSection("任务标签", labels));
     if (task.summary) content.append(detailSection("最近进展", detailText(task.summary)));
     const resources = el("div", "detail-resources"); list(task.resources).forEach((resource) => resources.append(el("code", "", resource)));
     if (!list(task.resources).length) resources.append(el("span", "empty-value", "未声明独占资源"));
@@ -437,6 +441,7 @@
     $("task-form-submit").textContent = task ? "保存修改" : "创建任务";
     $("task-title").value = task?.title || ""; $("task-description").value = task?.description || ""; $("task-priority").value = String(task?.priority ?? 2);
     $("task-capabilities").value = list(task?.required_capabilities).join(", "); $("task-resources").value = list(task?.resources).join("\n"); $("task-dependencies").value = list(task?.depends_on).join(", ");
+    $("task-labels").value = list(task?.labels).join(", ");
     setError("task-form-error", ""); openDialog($("task-form-dialog")); $("task-title").focus();
   }
   function splitValues(value) { return [...new Set(value.split(/[,，\n]/).map((item) => item.trim()).filter(Boolean))]; }
@@ -445,9 +450,15 @@
     const title = $("task-title").value.trim(); if (!title) { setError("task-form-error", "请填写任务标题。"); return; }
     const editing = state.editing;
     const payload = {title, description: $("task-description").value, priority: Number($("task-priority").value), resources: $("task-resources").value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean), depends_on: splitValues($("task-dependencies").value), required_capabilities: splitValues($("task-capabilities").value)};
+    payload.labels = splitValues($("task-labels").value);
     if (editing) payload.expected_revision = editing.revision;
     state.mutation = true; $("task-form-submit").disabled = true; setError("task-form-error", "");
     try {
+      const health = await api("/api/health");
+      if (!list(health.features).includes("task_labels")) {
+        if (payload.labels.length) throw new Error("服务尚不支持任务标签，请更新并重启服务。");
+        delete payload.labels;
+      }
       const response = await api(editing ? `/api/tasks/${encodeURIComponent(editing.id)}/edit` : "/api/tasks", {method: "POST", body: payload});
       $("task-form-dialog").close(); toast(editing ? "任务修改已保存" : "任务已创建，等待 Agent 认领"); await refresh({force: true});
       if (state.authenticated && !document.hidden && response.task?.id) openTaskDetail(response.task.id);
@@ -503,7 +514,21 @@
     catch (error) { if (error.status === 401 || error.status === 403) showLogin("管理会话已失效，请重新登录。"); else toast(`同步失败：${error.message}`, true); }
     finally { state.mutation = false; $("sync-button").disabled = false; }
   }
-  function clearFilters() { $("task-search").value = ""; $("status-filter").value = "all"; $("priority-filter").value = "all"; renderTasks(); }
+  let appliedLabel = ""; let labelRequest = 0;
+  function clearFilters() { labelRequest++; appliedLabel = ""; $("task-search").value = ""; $("label-filter").value = ""; $("status-filter").value = "all"; $("priority-filter").value = "all"; renderTasks(); }
+  async function filterLabels() {
+    const requestId = ++labelRequest;
+    const requested = $("label-filter").value.trim();
+    if (requested) {
+      try {
+        const health = await api("/api/health");
+        if (!list(health.features).includes("task_labels")) throw new Error("服务尚不支持任务标签，请更新并重启服务。");
+      } catch (error) { if (requestId !== labelRequest || $("label-filter").value.trim() !== requested) return; $("label-filter").value = ""; appliedLabel = ""; toast(error.message, true); renderTasks(); return; }
+    }
+    if (requestId !== labelRequest || $("label-filter").value.trim() !== requested) return;
+    appliedLabel = requested;
+    renderTasks();
+  }
   async function login(token) {
     const button = $("login-form").querySelector("button[type=submit]"); button.disabled = true; setError("login-error", "");
     try { await api("/api/session", {method: "POST", body: {token}}); $("admin-token").value = ""; await refresh({initial: true}); }
@@ -519,7 +544,7 @@
   $("logout-button").addEventListener("click", logout);
   $("mobile-logout-button").addEventListener("click", logout);
   $("refresh-button").addEventListener("click", () => refresh({manual: true, force: true})); $("sync-button").addEventListener("click", syncMarkdown);
-  $("task-search").addEventListener("input", renderTasks); $("status-filter").addEventListener("change", renderTasks); $("priority-filter").addEventListener("change", renderTasks); $("clear-filters").addEventListener("click", clearFilters);
+  $("task-search").addEventListener("input", renderTasks); $("label-filter").addEventListener("change", filterLabels); $("status-filter").addEventListener("change", renderTasks); $("priority-filter").addEventListener("change", renderTasks); $("clear-filters").addEventListener("click", clearFilters);
   $("create-task-button").addEventListener("click", () => openTaskForm()); $("empty-create-button").addEventListener("click", () => { if (!$("clear-filters").hidden) clearFilters(); else openTaskForm(); });
   $("task-form").addEventListener("submit", saveTask); $("action-form").addEventListener("submit", applyAction);
   document.querySelectorAll(".close-dialog").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));

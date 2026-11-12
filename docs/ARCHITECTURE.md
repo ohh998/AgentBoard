@@ -1,5 +1,9 @@
 # 架构与一致性边界
 
+任务 `labels` 随任务 JSON 存储及 Markdown 同步；旧任务读出为空数组。
+新客户端先核对 health 的 `task_labels` 能力标识，避免旧服务忽略字段。
+标签编辑仍由管理员通过事务内 revision 检查完成，与认领能力互不影响。
+
 目标是在单台机器、单个服务进程、多个异构 agent 之间协调任务，保持部署轻量且所有状态可检查。Python 标准库 HTTP 服务提供静态网页与 API；CLI 和网页连接同一进程。
 
 ## 组件与数据流
@@ -61,7 +65,7 @@ claim_generation 单调增加，为每次认领建立新的令牌世代。过期
 
 任务变更在数据库里标记待同步项。导出先写同目录临时文件，再 `os.replace` 原子替换，减少半份文件；崩溃后账本保留待同步信息，下次启动可恢复导出。
 
-文件格式是 `---` 包围的 JSON 对象（合法 YAML 子集），后面是 description 正文。JSON 只读状态字段帮助人工检查；导入只接受 title、description、priority、resources、depends_on、required_capabilities，不接受 owner、status 或 revision 的人为改动。
+文件格式是 `---` 包围的 JSON 对象（合法 YAML 子集），后面是 description 正文。JSON 只读状态字段帮助人工检查；导入只接受 title、description、priority、resources、depends_on、required_capabilities、labels，不接受 owner、status 或 revision 的人为改动。
 
 已有文件导入必须和账本 revision 一致，且任务处于 todo/blocked。新文件 revision 为 0，status todo，id 省略或等于安全文件名。推荐 CLI 创建新任务，不要复制现有任务快照来变更身份。
 

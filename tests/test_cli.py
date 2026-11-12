@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 from agentboard.server import make_server
 from agentboard.store import Store
@@ -86,6 +87,27 @@ class CliTests(unittest.TestCase):
 
     def create(self, title="中文协作任务"):
         return self.cli("create", "--title", title)["task"]
+
+    def test_create_and_filter_labels(self):
+        self.register()
+        task = self.cli('create', '--title', '分类任务', '--label', 'bug', '--label', 'needs-triage')['task']
+        self.create('其他任务')
+        self.assertEqual(task['labels'], ['bug', 'needs-triage'])
+        matches = self.cli('tasks', '--label', 'bug')['tasks']
+        self.assertEqual([item['id'] for item in matches], [task['id']])
+
+    def test_old_server_rejects_label_before_creating_task(self):
+        from agentboard.server import Handler
+        self.register()
+        dispatch = Handler._dispatch
+        def old_health(handler):
+            if handler.command == 'GET' and handler.path == '/api/health':
+                return handler._send(200, {'ok': True, 'protocol_version': '1'})
+            return dispatch(handler)
+        with mock.patch.object(Handler, '_dispatch', old_health):
+            self.cli('create', '--title', '不得创建', '--label', 'bug', expected=1)
+            self.cli('tasks', '--label', 'bug', expected=1)
+        self.assertFalse(self.store.state()['tasks'])
 
     def claim(self, task):
         return self.cli("claim", task["id"])["task"]

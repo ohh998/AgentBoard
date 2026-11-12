@@ -234,6 +234,7 @@ def task_body(args: argparse.Namespace) -> dict[str, Any]:
     for field, override, default in (
         ("priority", args.priority, 1), ("resources", args.resource, []),
         ("depends_on", args.depends_on, []), ("required_capabilities", args.capability, []),
+        ("labels", args.label, []),
     ):
         result[field] = override if override is not None else metadata.get(field, default)
     return result
@@ -331,12 +332,19 @@ def execute(args: argparse.Namespace, profile_path: Path) -> dict[str, Any]:
                 if args.mine:
                     agent_id = profile.get("agent", {}).get("id")
                     tasks = [task for task in tasks if task.get("owner_id") == agent_id]
+                if args.label:
+                    if "task_labels" not in client.call("GET", "/api/health").get("features", []):
+                        raise CliError("服务尚不支持任务标签，请更新并重启服务。")
+                    tasks = [task for task in tasks if args.label in task.get("labels", [])]
                 response = {"tasks": tasks}
         elif args.command == "show":
             response = client.call("GET", "/api/tasks/" + parse.quote(args.task_id, safe=""))
             remember(profile, response["task"])
         elif args.command == "create":
-            response = client.call("POST", "/api/tasks", task_body(args))
+            body = task_body(args)
+            if body.get("labels") and "task_labels" not in client.call("GET", "/api/health").get("features", []):
+                raise CliError("服务尚不支持任务标签，请更新并重启服务。")
+            response = client.call("POST", "/api/tasks", body)
             remember(profile, response["task"])
         elif args.command == "sync":
             response = client.call("POST", "/api/markdown/sync", {})
@@ -464,6 +472,7 @@ def make_parser() -> argparse.ArgumentParser:
     tasks = sub("tasks", "列出任务并刷新本地 revision")
     tasks.add_argument("--status", choices=("todo", "in_progress", "blocked", "review", "done", "cancelled"))
     tasks.add_argument("--mine", action="store_true")
+    tasks.add_argument("--label", help="按任务标签精确筛选")
     show = sub("show", "查看任务详情并刷新本地 revision")
     show.add_argument("task_id")
     create = sub("create", "用 Markdown 文件或参数创建任务")
@@ -475,6 +484,7 @@ def make_parser() -> argparse.ArgumentParser:
     create.add_argument("--resource", action="append", help="工作区相对文件或以 / 结尾的目录，可重复")
     create.add_argument("--depends-on", action="append", help="依赖任务 ID，可重复")
     create.add_argument("--capability", action="append", help="要求的能力标签，可重复")
+    create.add_argument("--label", action="append", help="任务标签，可重复")
     claim = sub("claim", "原子认领任务；冲突时不自动抢占")
     claim.add_argument("task_id")
     claim.add_argument("--expected-revision", type=int)

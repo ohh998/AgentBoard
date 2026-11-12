@@ -83,6 +83,6 @@ HTTP 409 后执行：
 
 服务数据目录的 `tasks/*.md` 是任务正文和版本化快照。普通 agent 通过 CLI/API 创建和更新共享状态；修改现有正文由管理员 API `edit`，仅允许 `todo` / `blocked`。正在执行的任务需要调整正文或资源时，先停止并释放，再由管理员编辑。
 
-手工 Markdown 修改仅允许在无人持有该任务、暂停相关并发写入的维护窗口进行。管理员执行 `sync` 后，服务校验 revision，仅导入 title、description、priority、resources、depends_on、required_capabilities；不接受手工状态或所有者变更。
+手工 Markdown 修改仅允许在无人持有该任务、暂停相关并发写入的维护窗口进行。管理员执行 `sync` 后，服务校验 revision，仅导入 title、description、priority、resources、depends_on、required_capabilities、labels；不接受手工状态或所有者变更。
 
 服务检查已观察到的文件内容/hash 和 revision，发现冲突会保留文件并报告；原子替换避免读到半份导出文件。这不能原子锁住不配合协议的任意外部编辑器，外部写入与检查/替换之间仍有竞态。因此不要在运行中的活跃任务文件上让多个编辑器直接写入。

@@ -171,7 +171,7 @@ class Handler(BaseHTTPRequestHandler):
         method = self.command
         store = self.server.store
         if method == "GET" and path == "/api/health":
-            return self._send(200, {"ok": True, "protocol_version": "1"})
+            return self._send(200, {"ok": True, "protocol_version": "1", "features": ["task_labels"]})
         if method == "GET" and not path.startswith("/api/"):
             return self._static(path)
         if method == "POST" and path == "/api/session":

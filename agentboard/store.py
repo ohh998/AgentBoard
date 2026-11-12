@@ -53,6 +53,13 @@ def strings(value, name, maximum=50):
     return list(dict.fromkeys(string(v, name, 200, True) for v in value))
 
 
+def labels(value):
+    result = strings(value, 'labels')
+    if any(re.search(r'[,，\x00-\x1f\x7f]', label) for label in result):
+        fail('invalid_input', '标签不能包含逗号或控制字符', 400)
+    return result
+
+
 def integer(value, name, low, high):
     if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
         fail("invalid_input", f"{name} 必须是 {low} 到 {high} 的整数", 400)
@@ -235,7 +242,7 @@ class Store:
         self._dirty(conn, "events.md", "events")
 
     def _public_task(self, task):
-        return {key: val for key, val in task.items() if key != "claim_token"}
+        return {"labels": [], **{key: val for key, val in task.items() if key != "claim_token"}}
 
     def _public_agent(self, agent):
         agent = dict(agent)
@@ -337,7 +344,8 @@ class Store:
                 "priority": integer(payload.get("priority", 1), "priority", 0, 3),
                 "resources": list(dict.fromkeys(resource(v) for v in strings(payload.get("resources", []), "resources"))),
                 "depends_on": strings(payload.get("depends_on", []), "depends_on"),
-                "required_capabilities": strings(payload.get("required_capabilities", []), "required_capabilities")}
+                "required_capabilities": strings(payload.get("required_capabilities", []), "required_capabilities"),
+                "labels": labels(payload.get("labels", []))}
 
     def _dependencies(self, conn, ident, dependencies):
         if ident in dependencies:
@@ -653,7 +661,7 @@ class Store:
                             if ident != path.stem:
                                 fail("filename_mismatch", "任务 id 必须等于 Markdown 文件名", 400)
                             existing = conn.execute("SELECT data FROM tasks WHERE id=?", (ident,)).fetchone()
-                            payload = {k: metadata[k] for k in ("title", "priority", "resources", "depends_on", "required_capabilities") if k in metadata}
+                            payload = {k: metadata[k] for k in ("title", "priority", "resources", "depends_on", "required_capabilities", "labels") if k in metadata}
                             payload["description"] = description
                             if existing:
                                 task = json.loads(existing["data"])

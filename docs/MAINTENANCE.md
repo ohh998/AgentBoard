@@ -19,6 +19,7 @@
 
 1. `git status --short` 查看其他 agent 的工作；确定自己负责的文件，不回退他人改动。
 2. 改接口时同步契约、服务器、CLI、UI、测试和文档。新增写入必须走事务内所有权/版本检查。
+   涉及 API、认证、标签、任务状态、资源或 CLI 兼容性时，按 [工程技能接入](ENGINEERING_SKILLS.md) 检查下游配置。
 3. 用独立临时数据目录运行验证，不在用户实际 `.agentboard` 账本上做破坏性实验。
 4. 运行相关检查，检查任务文档冲突及浏览器显示，再总结验证结果。
 5. 审查 `git diff --check` 与 `git diff --stat`；只提交源代码、测试、模板和维护文档。
@@ -47,7 +48,7 @@ python -S agentctl.py --data-dir .agentboard-smoke --profile smoke create --file
 常规协作用 API 修改共享任务正文和状态，避免直接编辑运行中的 `tasks/*.md`。确有离线维护需求时：
 
 1. 确认受影响任务没有活跃 owner，暂停所有可能修改它们的 agent、网页操作和同步。必要时停止服务，保留租约/后台程序的停工安排。
-2. 备份数据目录和准备修改的 Markdown。只修改 title、description、priority、resources、depends_on、required_capabilities；保留现有 id 与 revision，不改状态/owner/令牌。
+2. 备份数据目录和准备修改的 Markdown。只修改 title、description、priority、resources、depends_on、required_capabilities、labels；保留现有 id 与 revision，不改状态/owner/令牌。
 3. 启动服务但暂不恢复参与者，运行 `python -S agentctl.py --data-dir DIR sync`。它从 `admin.token` 读取权限，不需要先登记 agent。
 4. 检查响应和网页 Markdown 冲突。确认导入结果、资源和依赖都正确后，再恢复工作。
 

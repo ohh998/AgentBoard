@@ -1,5 +1,16 @@
 # HTTP API v1
 
+## 任务标签
+
+`GET /api/health` 返回 `features`，包含 `task_labels` 表示支持任务标签。
+创建任务及管理员编辑可选 `labels` 字符串数组，缺省为空；旧任务读取时
+返回空数组。标签最多 50 个，每项不超过 200 字符，不能包含逗号、
+中文逗号或控制字符；重复项去重。旧客户端编辑时未提供 `labels` 则
+保留原值。编辑仍需管理员权限、当前 revision 和 todo/blocked 状态。
+`GET /api/state` 的任务包含 labels，可由客户端精确过滤。标签与
+`required_capabilities` 及任务状态相互独立，不触发认领、关闭或审核。
+升级静态文件后必须重启服务；能力标识缺失时客户端不得发送标签写入。
+
 基地址默认 `http://127.0.0.1:8765`，协议版本 `"1"`。JSON 使用 UTF-8；写请求需 `Content-Type: application/json`。成功通常返回 200/201，错误返回 `{"error":{"code":"...","message":"...","details":{}}}`，details 可省略。时间为 UTC ISO 8601，不是客户端本地时间。
 
 ## 身份与认证
@@ -115,7 +126,7 @@ context 结构：`used_tokens` null 或非负整数，`max_tokens` null 或正�
 
 | `POST /api/tasks/ID/...` | 字段与状态 |
 | --- | --- |
-| `edit` | title、description、priority、resources、depends_on、required_capabilities 可选；仅 todo/blocked |
+| `edit` | title、description、priority、resources、depends_on、required_capabilities、labels 可选；仅 todo/blocked |
 | `reopen` | reason 可选；blocked/review/done/cancelled → todo |
 | `approve` | 仅 review → done |
 | `cancel` | reason 可选；非 done/cancelled，可终止活跃认领 |
@@ -124,7 +135,7 @@ context 结构：`used_tokens` null 或非负整数，`max_tokens` null 或正�
 
 ## 对象字段
 
-task：id、title、description、status、priority、revision、owner_id、lease_expires_at、claim_generation、resources、depends_on、required_capabilities、created_at、updated_at、result、blocker、progress、summary。
+task：id、title、description、status、priority、revision、owner_id、lease_expires_at、claim_generation、resources、depends_on、required_capabilities、labels、created_at、updated_at、result、blocker、progress、summary。
 
 agent：id、name、client、model、capabilities、status、context、summary、last_seen_at、current_task_id。离线状态依据心跳时间计算；客户端不应把 offline 解释为任务必然尚未回收。
 

@@ -1,5 +1,9 @@
 # Agent Board / 本地协作台
 
+任务支持独立分诊标签：创建时可重复使用 `--label bug`，查询时使用
+`tasks --label bug` 精确筛选；管理员可在网页编辑标签。标签不代表执行
+能力，也不改变任务状态。更新代码后需重启服务以启用标签接口。
+
 使用本地 Markdown 任务文档，让不同客户端、不同模型的 agent 通过同一个轻量网页服务协作。只需要 **Python 3.11+**，没有 pip、Node 或外部数据库依赖；默认仅监听 `127.0.0.1:8765`。
 
 网页可查看任务、认领者、客户端、模型、工作摘要、心跳以及上下文用量。任务正文保存在 Markdown；SQLite 负责原子认领、租约、版本检查和协议资源锁，防止多个 agent 同时领取同一任务或冲突资源。
@@ -98,6 +102,7 @@ profile 是本地身份目录，不是模型名称。凭据位于 `.agentboard/c
 - [CPU 与内存](docs/PERFORMANCE.md)：标准库启动、低频心跳、测量方法与使用边界。
 - [架构](docs/ARCHITECTURE.md)：账本、快照、事务、锁、崩溃恢复和边界。
 - [维护手册](docs/MAINTENANCE.md)：源码地图、验证、备份、同步、Git 与故障排查。
+- [工程技能接入](docs/ENGINEERING_SKILLS.md)：Matt Pocock 工程技能的 AgentBoard 接入与升级检查。
 - [任务模板](examples/task-template.md)、[成果交接模板](examples/handoff-template.md)。
 
 这是可信本机协作工具。环回监听、同源限制、管理和 agent 凭据分别处理应用权限；同一系统用户下能读取凭据文件的进程仍处于相同信任边界。任务资源锁不会强制隔离源文件，服务不会执行任务内的 shell 命令。

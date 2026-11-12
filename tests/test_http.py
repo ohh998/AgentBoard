@@ -84,6 +84,21 @@ class HttpTests(unittest.TestCase):
             self.assertEqual(status, 200)
             self.assertEqual(content["protocol_version"], "1")
 
+    def test_labels_preserve_permissions_and_revision(self):
+        registration = self.register()
+        status, body, _ = self.request('GET', '/api/health')
+        self.assertIn('task_labels', body['features'])
+        status, body, _ = self.request('POST', '/api/tasks', {'title': 'label', 'labels': ['bug']}, token=registration['token'])
+        self.assertEqual(status, 201)
+        task = body['task']
+        self.assertEqual(task['labels'], ['bug'])
+        path = f"/api/tasks/{task['id']}/edit"
+        self.assert_api_error(self.request('POST', path, {'expected_revision': task['revision'], 'labels': ['enhancement']}, token=registration['token']), 403)
+        status, changed, _ = self.request('POST', path, {'expected_revision': task['revision'], 'labels': ['enhancement']}, token=self.admin)
+        self.assertEqual(status, 200)
+        self.assertEqual(changed['task']['labels'], ['enhancement'])
+        self.assert_api_error(self.request('POST', path, {'expected_revision': task['revision'], 'labels': ['bug']}, token=self.admin), 409)
+
     def test_unchanged_state_uses_etag_and_returns_empty_304(self):
         self.create_task()
         status, state, headers = self.request("GET", "/api/state", token=self.admin)
