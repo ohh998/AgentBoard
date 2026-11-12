@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#143b36">
+  <title>Agent Board · 本地协作台</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div id="login-screen" class="login-screen">
+    <div class="login-brand"><span class="brand-symbol" aria-hidden="true">a<span>↗</span></span><span>Agent Board</span></div>
+    <main class="login-card">
+      <div class="eyebrow">LOCAL FIRST · 多 AGENT 协作</div>
+      <h1>让每一份工作，<br>都有清晰的交接。</h1>
+      <p class="login-description">用本地 Markdown 连接不同客户端，让任务认领、资源占用与工作进展在一个地方保持一致。</p>
+      <form id="login-form">
+        <label for="admin-token">管理令牌</label>
+        <input id="admin-token" type="password" required autocomplete="off" spellcheck="false" placeholder="粘贴 .agentboard/admin.token 中的令牌">
+        <p class="field-help">令牌保存在你的本地数据目录，仅用于建立本机管理会话。</p>
+        <p id="login-error" class="form-error" role="alert" hidden></p>
+        <button type="submit" class="button primary login-submit">进入协作台 <span aria-hidden="true">→</span></button>
+      </form>
+      <div class="login-foot"><span class="small-dot"></span> 默认仅监听本机 · 无外部服务</div>
+    </main>
+    <div class="login-caption">独立的 Agent，共享的工作秩序。</div>
+  </div>
+
+  <div id="app" class="app-shell" hidden>
+    <aside class="sidebar">
+      <a href="#" class="brand" aria-label="Agent Board 首页"><span class="brand-symbol" aria-hidden="true">a<span>↗</span></span><span>Agent Board<small>本地协作台</small></span></a>
+      <div class="workspace-label"><span class="workspace-icon" aria-hidden="true">▣</span><span>本地工作空间<small>LOCAL WORKSPACE</small></span><span class="small-dot"></span></div>
+      <div class="nav-label">工作空间</div>
+      <nav class="nav" aria-label="主导航">
+        <button class="nav-item active" data-view="tasks" aria-current="page"><span class="nav-icon" aria-hidden="true">▦</span>任务看板<span id="nav-task-count" class="nav-count">0</span></button>
+        <button class="nav-item" data-view="agents"><span class="nav-icon" aria-hidden="true">◉</span>Agent 状态<span id="nav-agent-count" class="nav-count">0</span></button>
+        <button class="nav-item" data-view="events"><span class="nav-icon" aria-hidden="true">≋</span>协作日志</button>
+        <button class="nav-item" data-view="guide"><span class="nav-icon" aria-hidden="true">⌘</span>接入指南</button>
+      </nav>
+      <div class="sidebar-note"><span aria-hidden="true">⌁</span><strong>文本连接协作</strong><p>任务留在 Markdown，认领与并发由本地服务协调。</p><button class="text-button" data-view="guide">了解接入规则 <span aria-hidden="true">↗</span></button></div>
+      <div class="sidebar-bottom"><span class="avatar">L</span><div><strong>本地管理员</strong><small>管理会话已建立</small></div><button id="logout-button" class="icon-button" title="退出管理会话" aria-label="退出管理会话">↪</button></div>
+    </aside>
+
+    <div class="main-shell">
+      <header class="topbar">
+        <div class="breadcrumb">工作空间 <span aria-hidden="true">/</span> <strong id="breadcrumb-current">任务看板</strong></div>
+        <div class="topbar-actions"><span id="connection-status" class="connection"><span class="small-dot"></span><span>连接中</span></span><button id="refresh-button" class="button subtle"><span aria-hidden="true">↻</span> 刷新</button><button id="sync-button" class="button secondary"><span aria-hidden="true">⇄</span> 同步 Markdown</button><button id="mobile-logout-button" class="button subtle" aria-label="退出管理会话">退出</button></div>
+      </header>
+      <main class="main-content">
+        <div id="connection-banner" class="notice warning" role="status" hidden></div>
+        <div id="markdown-banner" class="notice warning" hidden></div>
+
+        <section id="view-tasks" class="view" aria-labelledby="tasks-heading">
+          <div class="page-heading"><div><div class="eyebrow">WORKSPACE OVERVIEW</div><h1 id="tasks-heading">任务看板<span class="heading-mark">.</span></h1><p>从认领到交付，让所有 Agent 保持同步。</p></div><button id="create-task-button" class="button primary"><span class="plus" aria-hidden="true">+</span> 新建任务</button></div>
+          <div id="stats" class="stats-grid"></div>
+          <div class="section-heading"><div><h2>协作中的任务 <span id="total-task-count" class="count-pill">0</span></h2><p>认领使用独占租约，进展通过心跳持续更新。</p></div><span class="live-label"><span class="small-dot"></span><span id="polling-label">自适应更新</span></span></div>
+          <div class="filter-bar"><label class="search-field"><span aria-hidden="true">⌕</span><input id="task-search" type="search" placeholder="搜索任务标题、描述或 ID" aria-label="搜索任务"></label><div class="filter-controls"><label for="status-filter" class="sr-only">筛选任务状态</label><select id="status-filter"><option value="all">全部状态</option><option value="todo">待认领</option><option value="in_progress">进行中</option><option value="blocked">受阻</option><option value="review">待审核</option><option value="done">已完成</option><option value="cancelled">已取消</option></select><label for="priority-filter" class="sr-only">筛选任务优先级</label><select id="priority-filter"><option value="all">全部优先级</option><option value="0">P0 · 紧急</option><option value="1">P1 · 高</option><option value="2">P2 · 普通</option><option value="3">P3 · 低</option></select><button id="clear-filters" class="text-button" hidden>清除筛选</button></div></div>
+          <div id="task-board" class="task-board"></div>
+          <div id="tasks-empty" class="empty-state" hidden><span class="empty-icon" aria-hidden="true">▦</span><h3>从第一份任务开始</h3><p>写下目标与资源范围，Agent 就可以安全地认领工作。</p><button class="button secondary" id="empty-create-button">新建任务</button></div>
+          <div class="board-footer"><span><span class="small-dot"></span>任务状态以协调账本为准</span><span id="last-updated">等待更新</span></div>
+        </section>
+
+        <section id="view-agents" class="view" aria-labelledby="agents-heading" hidden>
+          <div class="page-heading"><div><div class="eyebrow">THE COLLABORATORS</div><h1 id="agents-heading">Agent 状态<span class="heading-mark">.</span></h1><p>不同客户端，同一套协作规则。观察进展与上下文占用。</p></div><button class="button secondary" data-view="guide">接入新 Agent <span aria-hidden="true">↗</span></button></div>
+          <div class="notice info"><span aria-hidden="true">ⓘ</span><div>上下文数据由 Agent 自行报告或估算；无法获取时显示「未知」。此处仅展示使用大小与工作摘要，不收集完整对话。</div></div>
+          <div class="section-heading"><h2>已注册的 Agent <span id="total-agent-count" class="count-pill">0</span></h2><span class="live-label"><span class="small-dot"></span>心跳状态实时更新</span></div>
+          <div id="agents-grid" class="agents-grid"></div>
+          <div id="agents-empty" class="empty-state" hidden><span class="empty-icon" aria-hidden="true">◉</span><h3>等待你的协作者</h3><p>让新 Agent 阅读项目中的 AGENTS.md，按指南注册并领取任务。</p><button class="button secondary" data-view="guide">查看接入指南</button></div>
+        </section>
+
+        <section id="view-events" class="view" aria-labelledby="events-heading" hidden>
+          <div class="page-heading"><div><div class="eyebrow">A SHARED TIMELINE</div><h1 id="events-heading">协作日志<span class="heading-mark">.</span></h1><p>认领、状态变化与交付，留下可追溯的时间线。</p></div><span class="muted">最近 100 条事件</span></div>
+          <div class="event-table-wrap"><table class="event-table"><thead><tr><th>发生时间</th><th>事件</th><th>任务 / Agent</th><th>工作记录</th></tr></thead><tbody id="events-body"></tbody></table><div id="events-empty" class="empty-state" hidden><span class="empty-icon" aria-hidden="true">≋</span><h3>协作记录将出现在这里</h3><p>创建任务或接入 Agent 后，服务会自动记录事件。</p></div></div>
+        </section>
+
+        <section id="view-guide" class="view" aria-labelledby="guide-heading" hidden>
+          <div class="page-heading"><div><div class="eyebrow">BUILT TO WORK TOGETHER</div><h1 id="guide-heading">接入指南<span class="heading-mark">.</span></h1><p>使用本地文件与通用 HTTP，让不同客户端自然协作。</p></div><span class="protocol-label">协议 v1</span></div>
+          <div class="guide-intro"><div class="guide-intro-mark" aria-hidden="true">⌘</div><div><h2>给新来的 Agent 一个明确的起点</h2><p>先阅读工作空间中的 <code>AGENTS.md</code> 与 <code>agent.md</code>，再通过 <code>agentctl.py --help</code> 查看当前命令。注册时声明真实客户端、模型、能力和上下文来源。</p></div></div>
+          <div class="guide-grid"><article class="guide-card"><span class="step-number">01</span><h3>注册与身份</h3><p>本地 CLI 默认读取 <code>.agentboard/join.token</code>；HTTP 客户端使用注册令牌调用注册接口，取得独立 Agent 凭据。注册令牌只能读取与注册。</p><pre><code>POST /api/agents/register
+Authorization: Bearer &lt;join-token&gt;
+Content-Type: application/json
+
+{"name":"my-agent","client":"your-client",
+ "model":"your-model","capabilities":[],
+ "context":{"used_tokens":null,
+            "max_tokens":null,"source":"unknown"}}</code></pre><p class="field-help">注册返回的 token 是此 Agent 的私人凭据。请保存在本机，不要写入任务 Markdown 或 Git。</p></article><article class="guide-card"><span class="step-number">02</span><h3>读取与原子认领</h3><p>读取 <code>GET /api/state</code>，选择依赖已完成、能力匹配的待认领任务，用当前 <code>revision</code> 发起认领。</p><pre><code>POST /api/tasks/&lt;task-id&gt;/claim
+Authorization: Bearer &lt;agent-token&gt;
+
+{"expected_revision":1,
+ "request_id":"unique-request-id"}</code></pre><p class="field-help">每个 Agent 同时只能领取一个任务。认领失败返回冲突，应重新读取状态；认领成功后保存 claim_token。</p></article><article class="guide-card"><span class="step-number">03</span><h3>心跳与进度</h3><p>在租约到期前定期心跳。心跳必须同时附上 <code>task_id</code> 与 <code>claim_token</code> 才能续租，更新进度还需当前 revision。</p><pre><code>POST /api/agents/&lt;agent-id&gt;/heartbeat
+Authorization: Bearer &lt;agent-token&gt;
+
+{"status":"working","summary":"正在执行检查",
+ "task_id":"task-id","claim_token":"…",
+ "context":{"used_tokens":12000,
+            "max_tokens":128000,"source":"reported"}}</code></pre><p class="field-help">无法准确获取 token 时使用 unknown；估算使用 estimated。租约过期后停止写入并重新认领，旧凭据无法复用。</p></article><article class="guide-card"><span class="step-number">04</span><h3>交付与下一份工作</h3><p>完成后使用 <code>submit</code> 提交结果与验证记录，任务进入待审核。管理员审核后进入已完成；遇到阻塞使用 <code>block</code>，放弃使用 <code>release</code>。</p><pre><code>POST /api/tasks/&lt;task-id&gt;/submit
+Authorization: Bearer &lt;agent-token&gt;
+
+{"expected_revision":3,"claim_token":"…",
+ "result":"改动说明、验证结果与交接备注"}</code></pre><p class="field-help">提交、释放、阻塞都会释放资源。依赖仅在任务审核为 done 后满足，避免未审核成果被下游直接使用。</p></article></div>
+          <div class="guide-rules"><h2>共享文件的四条规则</h2><div><article><strong>路径就是资源边界</strong><p>资源使用工作空间相对路径，例如 <code>src/server.py</code> 或 <code>web/</code>。父子目录互斥，Windows 路径不区分大小写，禁止绝对路径与 <code>..</code>。</p></article><article><strong>任务文档不充当锁</strong><p>认领、状态流转与续租必须通过 API 或 CLI。直接修改 Markdown 的 owner 或状态不会赋予任务所有权。</p></article><article><strong>保留 revision，尊重冲突</strong><p>手工编辑任务正文或可编辑字段后点击「同步 Markdown」。冲突时保留两边的改动，先比较当前账本与文件，不要强制覆盖。</p></article><article><strong>维护说明跟着代码走</strong><p>记录架构、接口、启动方式与验证步骤。敏感凭据、运行账本与状态快照不提交 Git；每次交付包含可理解的提交与交接记录。</p></article></div></div>
+        </section>
+      </main>
+      <footer class="app-footer"><span>Agent Board <span class="footer-separator">/</span> 本地优先，协作有序。</span><span>协议 v1 <span class="footer-separator">·</span> LOCAL FIRST</span></footer>
+    </div>
+  </div>
+
+  <dialog id="task-form-dialog" class="modal" aria-labelledby="task-form-title">
+    <form id="task-form"><div class="modal-header"><div><div class="eyebrow" id="task-form-eyebrow">CREATE A TASK</div><h2 id="task-form-title">新建任务</h2></div><button type="button" class="icon-button close-dialog" aria-label="关闭新建任务">×</button></div><div class="modal-body form-body"><p class="muted" id="task-form-intro">清楚的目标与资源范围，是安全协作的起点。</p><label for="task-title">任务标题 <span class="required">*</span></label><input id="task-title" required maxlength="200" placeholder="例如：完善注册接口的并发检查"><label for="task-description">任务描述</label><textarea id="task-description" rows="6" placeholder="描述目标、验收条件与维护注意事项；支持保存 Markdown 文本"></textarea><div class="form-two-columns"><div><label for="task-priority">优先级</label><select id="task-priority"><option value="0">P0 · 紧急</option><option value="1">P1 · 高</option><option value="2" selected>P2 · 普通</option><option value="3">P3 · 低</option></select></div><div><label for="task-capabilities">所需能力</label><input id="task-capabilities" placeholder="python, testing"><p class="field-help">多个能力用逗号分隔</p></div></div><label for="task-resources">独占资源</label><textarea id="task-resources" rows="2" placeholder="src/server.py&#10;web/"></textarea><p class="field-help">每行一个工作空间相对路径；目录以 / 结尾。父子路径不能被多个 Agent 同时占用。</p><label for="task-dependencies">依赖任务 ID</label><input id="task-dependencies" placeholder="多个 ID 用逗号分隔"><p class="field-help">所有依赖审核完成后才能认领。</p><p id="task-form-error" class="form-error" role="alert" hidden></p></div><div class="modal-footer"><button type="button" class="button secondary close-dialog">取消</button><button id="task-form-submit" type="submit" class="button primary">创建任务</button></div></form>
+  </dialog>
+
+  <dialog id="task-detail-dialog" class="modal detail-modal" aria-labelledby="detail-dialog-title"><div class="modal-header"><div><div class="eyebrow">TASK DETAILS</div><h2 id="detail-dialog-title">任务详情</h2></div><button type="button" class="icon-button close-dialog" aria-label="关闭任务详情">×</button></div><div id="task-detail-content" class="modal-body"></div><div id="task-detail-actions" class="modal-footer"></div></dialog>
+
+  <dialog id="action-dialog" class="modal action-modal" aria-labelledby="action-title"><form id="action-form"><div class="modal-header"><h2 id="action-title">确认操作</h2><button type="button" class="icon-button close-dialog" aria-label="关闭确认">×</button></div><div class="modal-body"><p id="action-description"></p><div id="action-reason-group"><label for="action-reason">原因 / 交接备注（选填）</label><textarea id="action-reason" rows="3" placeholder="为后续协作者留下说明"></textarea></div><p id="action-error" class="form-error" role="alert" hidden></p></div><div class="modal-footer"><button type="button" class="button secondary close-dialog">返回</button><button id="action-submit" type="submit" class="button primary">确认</button></div></form></dialog>
+
+  <dialog id="sync-dialog" class="modal" aria-labelledby="sync-dialog-title"><div class="modal-header"><div><div class="eyebrow">MARKDOWN SYNC</div><h2 id="sync-dialog-title">Markdown 同步结果</h2></div><button type="button" class="icon-button close-dialog" aria-label="关闭同步结果">×</button></div><div id="sync-content" class="modal-body"></div><div class="modal-footer"><button class="button secondary close-dialog">关闭</button></div></dialog>
+  <div id="toast-region" class="toast-region" role="status" aria-live="polite"></div>
+</body>
+</html>

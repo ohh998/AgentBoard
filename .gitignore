@@ -1,0 +1,24 @@
+# 本地账本、令牌、agent 凭据、快照和锁。运行目录不要提交。
+.agentboard/
+.agentboard-*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+
+# 自定义 --data-dir 若在仓库内，请为它添加明确规则。
+credentials/
+admin.token
+join.token
+
+# ZIP release artifacts
+releases/
